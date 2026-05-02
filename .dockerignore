@@ -1,0 +1,17 @@
+.git
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+.env
+chroma_db
+.claude
+tests
+scripts
+*.md
+todo.md
+report.md
+custom_evaluation_results.txt
+EVAL.md
+EVAL_COMPARISON.md
+dataset/fixture_query.wav

@@ -25,6 +25,79 @@ Open [https://localhost:8501](https://localhost:8501) in your browser.
 
 ---
 
+## Architecture
+
+```mermaid
+flowchart TD
+    subgraph UI["Streamlit UI (streamlit_app.py)"]
+        MIC["🎙️ Mic Input\n(streamlit-mic-recorder)"]
+        TEXT["⌨️ Text Input\n(st.chat_input)"]
+        CHAT_HIST["Chat History\n(session_state)"]
+        AUDIO_OUT["🔊 Audio Playback\n(st.audio)"]
+        RESP_OUT["Response + Citations\n(st.write / st.markdown)"]
+    end
+
+    subgraph VOICE["Voice I/O (voice.py)"]
+        STT["STT\nfaster-whisper\nbase.en · CPU · int8"]
+        TTS["TTS\npyttsx3 / macOS say\n→ WAV bytes"]
+    end
+
+    subgraph SAFETY["Safety Gate (chat.py + prompts.py)"]
+        CLASSIFY["Intent Classifier\nOllama LLM\n(CLASSIFIER_PROMPT)"]
+        INTENTS["9 Intent Categories\ncrisis · self_harm · prompt_injection\nsectarian · fatwa · medical\nhallucination_bait · out_of_scope · spiritual"]
+        SAFE_RESP["Canned Safe Responses\n(8 unsafe categories)"]
+    end
+
+    subgraph RETRIEVAL["Hybrid Retrieval (search.py)"]
+        SEMANTIC["Semantic Search\nChromaDB\n+ BGE-small-en-v1.5"]
+        BM25["Keyword Search\nBM25 (in-memory index)"]
+        RRF["Reciprocal Rank Fusion\nk=60 · top-10 results"]
+    end
+
+    subgraph GENERATION["Generation (chat.py + prompts.py)"]
+        CTX["Context Builder\nXML-formatted passages\n(deduplicated)"]
+        LLM["Ollama LLM\nqwen2.5:7b-instruct\n(SYSTEM_PROMPT + context)"]
+        CITE_VAL["Citation Validator\nfilter against retrieved IDs"]
+    end
+
+    subgraph STORE["Data Layer"]
+        CHROMA[("ChromaDB\nsakina_content\n~263 chunks")]
+        INGEST["Ingestion Pipeline\n(embedding.py)"]
+        JSONL["Dataset JSONL\nquran · hadith · articles"]
+        BGE["BGE-small-en-v1.5\n(SentenceTransformer)"]
+    end
+
+    MIC -->|"WAV bytes"| STT
+    STT -->|"transcript text"| CHAT_HIST
+    TEXT -->|"user text"| CHAT_HIST
+    CHAT_HIST -->|"user query"| CLASSIFY
+
+    CLASSIFY --> INTENTS
+    INTENTS -->|"unsafe (8 categories)"| SAFE_RESP
+    INTENTS -->|"spiritual"| SEMANTIC
+    INTENTS -->|"spiritual"| BM25
+
+    SEMANTIC --> RRF
+    BM25 --> RRF
+
+    RRF -->|"top-10 passages"| CTX
+    CTX -->|"system prompt + context"| LLM
+    LLM -->|"JSON {response, citations}"| CITE_VAL
+
+    SAFE_RESP -->|"safe response"| RESP_OUT
+    CITE_VAL -->|"response + validated citations"| RESP_OUT
+    CITE_VAL -->|"response text"| TTS
+    TTS -->|"WAV bytes"| AUDIO_OUT
+
+    JSONL --> INGEST
+    BGE --> INGEST
+    INGEST -->|"upsert chunks + embeddings"| CHROMA
+    CHROMA <-->|"similarity search"| SEMANTIC
+    CHROMA <-->|"all docs for BM25 index"| BM25
+```
+
+---
+
 ## Design Decisions
 
 ### RAG Design

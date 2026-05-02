@@ -19,7 +19,9 @@ docker exec -it sakina-app python -m sakina.embedding
 
 **3. Access the chat UI:**
 
-Open [http://localhost:8501](http://localhost:8501) in your browser.
+Open [https://localhost:8501](https://localhost:8501) in your browser.
+
+> **Browser security warning:** The app uses a self-signed TLS certificate so that the browser grants microphone access (browsers block `getUserMedia` on plain HTTP). On first visit you will see a "Your connection is not private" warning. Click **Advanced → Proceed to localhost (unsafe)** to continue. This is expected and safe for local use.
 
 ---
 

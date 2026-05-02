@@ -15,7 +15,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         espeak-ng \
         libsndfile1 \
         ffmpeg \
-        build-essential
+        build-essential \
+        openssl
+
+RUN openssl req -x509 -newkey rsa:2048 -keyout /app/ssl.key -out /app/ssl.crt \
+    -days 3650 -nodes -subj "/CN=localhost"
 
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
@@ -28,9 +32,11 @@ RUN mkdir -p /app/reports
 EXPOSE 8501
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"
+    CMD python -c "import urllib.request, ssl; urllib.request.urlopen('https://localhost:8501/_stcore/health', context=ssl._create_unverified_context())"
 
 CMD ["streamlit", "run", "sakina/streamlit_app.py", \
      "--server.port=8501", \
      "--server.address=0.0.0.0", \
-     "--server.headless=true"]
+     "--server.headless=true", \
+     "--server.sslCertFile=/app/ssl.crt", \
+     "--server.sslKeyFile=/app/ssl.key"]
